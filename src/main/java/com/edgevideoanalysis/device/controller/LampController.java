@@ -16,12 +16,14 @@ public class LampController {
 
     private final ILampService lampService;
 
-    @GetMapping
+    // 原来冲突的地方，现在改成 /list
+    @GetMapping("/list")
     public Result<List<LampVO>> listLamps() {
         return Result.success(lampService.listLamps());
     }
 
-    @GetMapping("/{id}")
+    // 原来冲突的地方，现在改成 /detail/{id}
+    @GetMapping("/detail/{id}")
     public Result<LampVO> getLampDetail(@PathVariable Long id) {
         return Result.success(lampService.getLampDetail(id));
     }
