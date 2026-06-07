@@ -3,6 +3,7 @@ package com.edgevideoanalysis.sensor.service.impl;
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.edgevideoanalysis.common.exception.BusinessException;
+import com.edgevideoanalysis.alarm.service.IAlarmRecordService;
 import com.edgevideoanalysis.sensor.dto.SensorDataDTO;
 import com.edgevideoanalysis.sensor.dto.SensorQueryDTO;
 import com.edgevideoanalysis.sensor.entity.SensorData;
@@ -25,6 +26,7 @@ public class SensorDataServiceImpl implements ISensorDataService {
 
     private final SensorDataMapper sensorDataMapper;
     private final StringRedisTemplate stringRedisTemplate;
+    private final IAlarmRecordService alarmRecordService;
 
     private static final String SENSOR_LATEST_KEY = "sensor:latest:";
 
@@ -45,6 +47,9 @@ public class SensorDataServiceImpl implements ISensorDataService {
         String redisKey = SENSOR_LATEST_KEY + dto.getLampId();
         String cacheData = JSON.toJSONString(dto);
         stringRedisTemplate.opsForValue().set(redisKey, cacheData, 1, TimeUnit.HOURS);
+
+        // 检查并触发报警
+        alarmRecordService.checkAndCreateAlarm(entity);
     }
 
     @Override
