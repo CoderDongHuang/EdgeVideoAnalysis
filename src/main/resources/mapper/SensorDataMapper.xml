@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.edgevideoanalysis.sensor.mapper.SensorDataMapper">
+
+    <!-- 历史数据查询 -->
+    <select id="queryHistoryData" resultType="java.util.Map">
+        SELECT
+            id,
+            lamp_id,
+            temperature,
+            humidity,
+            illumination,
+            voltage,
+            current,
+            capture_time,
+            create_time
+        FROM t_sensor_data
+        WHERE lamp_id = #{lampId}
+          AND capture_time BETWEEN #{startTime} AND #{endTime}
+        ORDER BY capture_time ASC
+    </select>
+
+    <!-- 曲线数据查询 -->
+    <select id="queryCurveData" resultType="java.util.Map">
+        SELECT
+            capture_time AS time,
+            <choose>
+                <when test="sensorType == 'temperature'">
+                    temperature AS value
+                </when>
+                <when test="sensorType == 'humidity'">
+                    humidity AS value
+                </when>
+                <when test="sensorType == 'illumination'">
+                    illumination AS value
+                </when>
+                <when test="sensorType == 'voltage'">
+                    voltage AS value
+                </when>
+                <when test="sensorType == 'current'">
+                    current AS value
+                </when>
+                <otherwise>
+                    temperature AS value
+                </otherwise>
+            </choose>
+        FROM t_sensor_data
+        WHERE lamp_id = #{lampId}
+          AND capture_time BETWEEN #{startTime} AND #{endTime}
+        ORDER BY capture_time ASC
+    </select>
+
+</mapper>
