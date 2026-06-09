@@ -26,8 +26,6 @@ public class VideoFrameHandler {
      */
     public String captureFrame(String cameraUrl) {
         FFmpegFrameGrabber grabber = null;
-        Java2DFrameConverter converter = new Java2DFrameConverter();
-        
         try {
             grabber = new FFmpegFrameGrabber(cameraUrl);
             grabber.setOption("rtsp_transport", "tcp");
@@ -40,32 +38,40 @@ public class VideoFrameHandler {
                 return null;
             }
             
-            // 将Frame转换为BufferedImage
-            BufferedImage bufferedImage = converter.convert(frame);
-            if (bufferedImage == null) {
-                log.warn("帧转换BufferedImage失败: {}", cameraUrl);
-                return null;
+            // 将Frame转换为BufferedImage并编码为Base64
+            try (Java2DFrameConverter converter = new Java2DFrameConverter()) {
+                BufferedImage bufferedImage = converter.convert(frame);
+                if (bufferedImage == null) {
+                    log.warn("帧转换BufferedImage失败: {}", cameraUrl);
+                    return null;
+                }
+                
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                ImageIO.write(bufferedImage, "jpg", baos);
+                byte[] imageBytes = baos.toByteArray();
+                return Base64.getEncoder().encodeToString(imageBytes);
             }
-            
-            // 转换为Base64
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ImageIO.write(bufferedImage, "jpg", baos);
-            byte[] imageBytes = baos.toByteArray();
-            
-            return Base64.getEncoder().encodeToString(imageBytes);
-            
         } catch (Exception e) {
             log.error("截取视频帧失败: {}", cameraUrl, e);
             return null;
         } finally {
-            try {
-                if (grabber != null) {
-                    grabber.stop();
-                    grabber.release();
-                }
-            } catch (Exception e) {
-                log.error("释放FFmpeg资源失败", e);
-            }
+            releaseGrabber(grabber);
+        }
+    }
+
+    private void releaseGrabber(FFmpegFrameGrabber grabber) {
+        if (grabber == null) {
+            return;
+        }
+        try {
+            grabber.stop();
+        } catch (Exception e) {
+            log.warn("停止grabber失败", e);
+        }
+        try {
+            grabber.release();
+        } catch (Exception e) {
+            log.warn("释放grabber失败", e);
         }
     }
 
