@@ -1,0 +1,12 @@
+# Docker相关
+.env
+*.qcow2
+*.vmdk
+*.vdi
+*.ova
+*.ovf
+
+# 数据卷目录（如果本地创建）
+mysql-data/
+redis-data/
+yolov8-models/

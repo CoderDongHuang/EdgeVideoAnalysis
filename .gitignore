@@ -1,18 +1,69 @@
-# Maven编译产物（最重要，打包jar全在这，禁止提交）
+# 敏感环境变量
+.env
+*.env.local
+*.env.*
+
+# Git 仓库
+.git
+.gitignore
+.gitattributes
+
+# 虚拟机 & 大体积磁盘
+*.qcow2
+*.vmdk
+*.vdi
+*.ova
+*.ovf
+
+# 运行时挂载数据（数据库、缓存、模型）
+mysql-data/
+redis-data/
+yolov8-models/
+*.pt
+*.pth
+*.onnx
+*.engine
+*.trt
+
+# Python 编译缓存
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Java 编译产物
 target/
+*.jar
+*.war
+*.ear
 
-# IDE配置文件
+# IDE 配置
 .idea/
-*.iml
 .vscode/
+*.iml
+.project
+.classpath
+.settings/
 
-# 系统缓存文件
+# 系统垃圾
 .DS_Store
 Thumbs.db
 
-# 日志文件
+# 日志与临时文件
 logs/
 *.log
-
-# 临时文件
 *.tmp
+*.bak
+
+# 压缩包
+*.tar
+*.tar.gz
+*.zip
+*.rar
+*.7z
+
+# 文档与说明（可选）
+README.md
+*.md
