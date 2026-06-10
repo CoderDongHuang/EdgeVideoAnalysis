@@ -24,7 +24,7 @@ public class InferenceRecord {
 
     private String inferenceResults;
 
-    private Long inferenceTime;
+    private LocalDateTime inferenceTime;
 
     private LocalDateTime createTime;
 }

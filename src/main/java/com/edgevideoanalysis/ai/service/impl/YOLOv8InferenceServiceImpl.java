@@ -103,7 +103,7 @@ public class YOLOv8InferenceServiceImpl implements IAIInferenceService {
             record.setProcessedImage(vo.getProcessedImage());
             record.setPersonCount(vo.getPersonCount());
             record.setInferenceResults(vo.getInferenceResults());
-            record.setInferenceTime(inferenceTime);
+            record.setInferenceTime(LocalDateTime.now());
             record.setCreateTime(LocalDateTime.now());
             inferenceRecordMapper.insert(record);
         } catch (Exception e) {
