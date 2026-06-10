@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.edgevideoanalysis.control.mapper.ControlCommandMapper">
+
+    <resultMap id="BaseResultMap" type="com.edgevideoanalysis.control.entity.ControlCommand">
+        <id column="id" property="id"/>
+        <result column="lamp_id" property="lampId"/>
+        <result column="command_type" property="commandType"/>
+        <result column="command_status" property="commandStatus"/>
+        <result column="create_time" property="createTime"/>
+        <result column="execute_time" property="executeTime"/>
+    </resultMap>
+
+</mapper>
