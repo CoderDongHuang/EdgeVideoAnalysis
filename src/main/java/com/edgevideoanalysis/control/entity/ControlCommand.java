@@ -28,9 +28,9 @@ public class ControlCommand {
     private String commandType;
 
     /**
-     * 指令状态: pending / executing / success / failed
+     * 指令状态: 0-待执行 1-执行中 2-成功 3-失败
      */
-    private String commandStatus;
+    private Integer commandStatus;
 
     /**
      * 创建时间

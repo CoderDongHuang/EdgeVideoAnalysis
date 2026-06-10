@@ -47,25 +47,25 @@ public class DeviceControlServiceImpl implements IDeviceControlService {
         ControlCommand command = new ControlCommand();
         command.setLampId(dto.getLampId());
         command.setCommandType(dto.getCommandType());
-        command.setCommandStatus("pending");
+        command.setCommandStatus(0); // 0-待执行
         command.setCreateTime(LocalDateTime.now());
         controlCommandMapper.insert(command);
 
         // 4. 下发控制命令（通过WebSocket推送）
         try {
             // 更新状态为执行中
-            command.setCommandStatus("executing");
+            command.setCommandStatus(1); // 1-执行中
             controlCommandMapper.updateById(command);
 
             // TODO: 实际项目中通过WebSocket或HTTP下发指令到设备
             // 这里模拟指令执行成功
-            command.setCommandStatus("success");
+            command.setCommandStatus(2); // 2-成功
             command.setExecuteTime(LocalDateTime.now());
             controlCommandMapper.updateById(command);
 
             log.info("LED控制指令下发成功: lampId={}, commandType={}", dto.getLampId(), dto.getCommandType());
         } catch (Exception e) {
-            command.setCommandStatus("failed");
+            command.setCommandStatus(3); // 3-失败
             controlCommandMapper.updateById(command);
             log.error("LED控制指令下发失败: lampId={}", dto.getLampId(), e);
         }
