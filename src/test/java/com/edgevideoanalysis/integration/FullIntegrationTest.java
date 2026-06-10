@@ -34,11 +34,11 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
- * 步骤9：全链路接口联调与性能测试
+ * 全链路接口联调与性能测试
  * 包含：
- *  - 9.1 全链路接口联调
- *  - 9.2 性能测试
- *  - 9.3 异常场景测试
+ *  - 1 全链路接口联调
+ *  - 2 性能测试
+ *  - 3 异常场景测试
  */
 @SpringBootTest
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -85,11 +85,11 @@ class FullIntegrationTest {
         doNothing().when(valueOperations).set(anyString(), anyString(), anyLong(), any(TimeUnit.class));
     }
 
-    // ==================== 步骤9.1：全链路接口联调 ====================
+    // ==================== 全链路接口联调 ====================
 
     @Test
     @Order(1)
-    @DisplayName("9.1.1 测试完整视频分析流程 - 前端请求→视频截取→AI推理→返回结果")
+    @DisplayName("测试完整视频分析流程 - 前端请求→视频截取→AI推理→返回结果")
     void testFullVideoAnalysisPipeline() {
         // 1. 准备测试数据
         Lamp lamp = new Lamp();
@@ -127,7 +127,7 @@ class FullIntegrationTest {
 
     @Test
     @Order(2)
-    @DisplayName("9.1.2 测试传感器报警流程 - 数据上报→报警判断→记录创建→WebSocket推送")
+    @DisplayName("测试传感器报警流程 - 数据上报→报警判断→记录创建→WebSocket推送")
     void testSensorAlarmPipeline() {
         // 1. 上报传感器数据
         SensorDataDTO sensorData = new SensorDataDTO();
@@ -155,7 +155,7 @@ class FullIntegrationTest {
 
     @Test
     @Order(3)
-    @DisplayName("9.1.3 测试设备控制流程 - 控制请求→指令下发→状态更新→结果反馈")
+    @DisplayName("测试设备控制流程 - 控制请求→指令下发→状态更新→结果反馈")
     void testDeviceControlPipeline() {
         // 1. 准备灯杆数据
         Lamp lamp = new Lamp();
@@ -182,11 +182,11 @@ class FullIntegrationTest {
         System.out.println("设备控制流程测试完成，指令状态: " + commandStatus.getCommandStatus());
     }
 
-    // ==================== 步骤9.2：性能测试 ====================
+    // ==================== 性能测试 ====================
 
     @Test
     @Order(4)
-    @DisplayName("9.2.1 测试单帧处理耗时（目标190ms内）")
+    @DisplayName("测试单帧处理耗时（目标190ms内）")
     void testSingleFrameProcessingTime() {
         Lamp lamp = new Lamp();
         lamp.setId(1L);
@@ -217,7 +217,7 @@ class FullIntegrationTest {
 
     @Test
     @Order(5)
-    @DisplayName("9.2.2 测试并发处理能力（4路视频同时处理）")
+    @DisplayName("测试并发处理能力（4路视频同时处理）")
     void testConcurrentVideoProcessing() throws InterruptedException {
         int concurrentStreams = 4; // 4路视频
         CountDownLatch startLatch = new CountDownLatch(1);
@@ -281,7 +281,7 @@ class FullIntegrationTest {
 
     @Test
     @Order(6)
-    @DisplayName("9.2.3 测试数据库查询性能（复合索引验证）")
+    @DisplayName("测试数据库查询性能（复合索引验证）")
     void testDatabaseQueryPerformance() {
         // 1. 插入测试数据
         for (int i = 0; i < 100; i++) {
@@ -309,7 +309,7 @@ class FullIntegrationTest {
 
     @Test
     @Order(7)
-    @DisplayName("9.2.4 测试Redis缓存命中率")
+    @DisplayName("测试Redis缓存命中率")
     void testRedisCacheHitRate() {
         // 这个测试需要实际Redis运行
         // 验证缓存策略是否正确实施
@@ -319,11 +319,11 @@ class FullIntegrationTest {
         assertTrue(true, "Redis缓存测试通过（需实际环境验证命中率）");
     }
 
-    // ==================== 步骤9.3：异常场景测试 ====================
+    // ==================== 异常场景测试 ====================
 
     @Test
     @Order(8)
-    @DisplayName("9.3.1 模拟网络断开，验证断线重连")
+    @DisplayName("模拟网络断开，验证断线重连")
     void testNetworkDisconnectionAndReconnect() {
         // 模拟网络断开 - 使用单独的lampId避免mock冲突
         Lamp lamp = new Lamp();
@@ -360,7 +360,7 @@ class FullIntegrationTest {
 
     @Test
     @Order(9)
-    @DisplayName("9.3.2 模拟设备离线，验证状态同步")
+    @DisplayName("模拟设备离线，验证状态同步")
     void testDeviceOfflineStatusSync() {
         // 模拟设备离线
         Lamp lamp = new Lamp();
@@ -377,7 +377,7 @@ class FullIntegrationTest {
 
     @Test
     @Order(10)
-    @DisplayName("9.3.3 模拟线程池满载，验证拒绝策略")
+    @DisplayName("模拟线程池满载，验证拒绝策略")
     void testThreadPoolFullLoadRejection() throws InterruptedException {
         int overloadRequests = 120; // 超过默认队列容量
         CountDownLatch latch = new CountDownLatch(overloadRequests);
@@ -427,7 +427,7 @@ class FullIntegrationTest {
 
     @Test
     @Order(11)
-    @DisplayName("9.3.4 模拟YOLOv8服务不可用，验证降级处理")
+    @DisplayName("模拟YOLOv8服务不可用，验证降级处理")
     void testYOLOv8ServiceUnavailable() {
         // 准备测试数据
         Lamp lamp = new Lamp();
