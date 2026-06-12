@@ -39,6 +39,14 @@ mybatis-plus:
       logic-delete-value: 1
       logic-not-delete-value: 0
 
+# Knife4j API文档配置
+knife4j:
+  enable: true
+  setting:
+    enable-footer: false
+    enable-footer-custom: true
+    footer-custom-content: "EdgeVideoAnalysis | 省一作品"
+
 # 日志配置
 logging:
   level:
