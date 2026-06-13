@@ -25,6 +25,20 @@ spring:
         min-idle: 0
         max-wait: -1ms
 
+  # RabbitMQ配置
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1000ms
+        default-requeue-rejected: false
+
 # MyBatis-Plus配置
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml

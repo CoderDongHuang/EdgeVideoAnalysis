@@ -9,9 +9,11 @@ import com.edgevideoanalysis.sensor.dto.SensorQueryDTO;
 import com.edgevideoanalysis.sensor.entity.SensorData;
 import com.edgevideoanalysis.sensor.mapper.SensorDataMapper;
 import com.edgevideoanalysis.sensor.service.ISensorDataService;
+import com.edgevideoanalysis.sensor.service.SensorDataProducer;
 import com.edgevideoanalysis.sensor.vo.SensorCurveVO;
 import com.edgevideoanalysis.sensor.vo.SensorDataVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SensorDataServiceImpl implements ISensorDataService {
@@ -27,11 +30,27 @@ public class SensorDataServiceImpl implements ISensorDataService {
     private final SensorDataMapper sensorDataMapper;
     private final StringRedisTemplate stringRedisTemplate;
     private final IAlarmRecordService alarmRecordService;
+    private final SensorDataProducer sensorDataProducer;
 
     private static final String SENSOR_LATEST_KEY = "sensor:latest:";
 
     @Override
     public void reportData(SensorDataDTO dto) {
+        // 1. 异步削峰：投递到 RabbitMQ
+        boolean sent = sensorDataProducer.sendSensorData(dto);
+        if (sent) {
+            return; // MQ 投递成功，由 Consumer 异步消费处理
+        }
+
+        // 2. MQ 不可用时同步兜底，保证数据不丢失
+        log.warn("MQ不可用，降级为同步处理: lampId={}", dto.getLampId());
+        processSync(dto);
+    }
+
+    /**
+     * 同步处理（MQ降级兜底）
+     */
+    private void processSync(SensorDataDTO dto) {
         SensorData entity = new SensorData();
         entity.setLampId(dto.getLampId());
         entity.setTemperature(dto.getTemperature());

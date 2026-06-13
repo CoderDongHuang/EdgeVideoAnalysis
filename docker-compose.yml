@@ -44,6 +44,27 @@ services:
       timeout: 5s
       retries: 5
 
+  # RabbitMQ 消息队列
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: eva-rabbitmq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - eva-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # MQTT Broker (Mosquitto)
   mosquitto:
     image: eclipse-mosquitto:2
@@ -98,6 +119,10 @@ services:
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
       SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-123456}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
       MQTT_BROKER_URL: tcp://mosquitto:1883
       YOLO_SERVICE_URL: http://yolov8:5000
     ports:
@@ -106,6 +131,8 @@ services:
       mysql:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       mosquitto:
         condition: service_healthy
@@ -125,6 +152,8 @@ volumes:
   mysql-data:
     driver: local
   redis-data:
+    driver: local
+  rabbitmq-data:
     driver: local
   mosquitto-data:
     driver: local
