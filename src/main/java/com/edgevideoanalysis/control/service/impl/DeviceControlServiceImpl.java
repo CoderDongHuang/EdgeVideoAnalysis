@@ -4,9 +4,9 @@ import com.edgevideoanalysis.control.dto.ControlCommandDTO;
 import com.edgevideoanalysis.control.entity.ControlCommand;
 import com.edgevideoanalysis.control.mapper.ControlCommandMapper;
 import com.edgevideoanalysis.control.service.IDeviceControlService;
-import com.edgevideoanalysis.device.mapper.LampMapper;
+import com.edgevideoanalysis.control.service.MqttCommandPublisher;
 import com.edgevideoanalysis.device.entity.Lamp;
-import com.edgevideoanalysis.websocket.handler.DeviceWebSocketHandler;
+import com.edgevideoanalysis.device.mapper.LampMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 
 /**
  * 设备控制服务实现
+ * HTTP 接收指令 → MQTT 下发到设备 → 设备执行 → 状态记录
  */
 @Slf4j
 @Service
@@ -25,6 +26,7 @@ public class DeviceControlServiceImpl implements IDeviceControlService {
     private final ControlCommandMapper controlCommandMapper;
     private final LampMapper lampMapper;
     private final StringRedisTemplate stringRedisTemplate;
+    private final MqttCommandPublisher mqttCommandPublisher;
 
     private static final String DEVICE_STATUS_KEY = "device:status:";
 
@@ -43,7 +45,7 @@ public class DeviceControlServiceImpl implements IDeviceControlService {
             throw new RuntimeException("设备离线: lampId=" + dto.getLampId());
         }
 
-        // 3. 创建控制指令记录
+        // 3. 创建控制指令记录（状态：待执行）
         ControlCommand command = new ControlCommand();
         command.setLampId(dto.getLampId());
         command.setCommandType(dto.getCommandType());
@@ -51,24 +53,23 @@ public class DeviceControlServiceImpl implements IDeviceControlService {
         command.setCreateTime(LocalDateTime.now());
         controlCommandMapper.insert(command);
 
-        // 4. 下发控制命令（通过WebSocket推送）
-        try {
-            // 更新状态为执行中
-            command.setCommandStatus(1); // 1-执行中
-            controlCommandMapper.updateById(command);
+        // 4. 更新状态为执行中
+        command.setCommandStatus(1); // 1-执行中
+        controlCommandMapper.updateById(command);
 
-            // TODO: 实际项目中通过WebSocket或HTTP下发指令到设备
-            // 这里模拟指令执行成功
+        // 5. 通过 MQTT 下发指令到设备
+        boolean published = mqttCommandPublisher.publishCommand(
+                dto.getLampId(), dto.getCommandType());
+
+        if (published) {
             command.setCommandStatus(2); // 2-成功
             command.setExecuteTime(LocalDateTime.now());
-            controlCommandMapper.updateById(command);
-
-            log.info("LED控制指令下发成功: lampId={}, commandType={}", dto.getLampId(), dto.getCommandType());
-        } catch (Exception e) {
+            log.info("LED 控制指令已下发: lampId={}, commandType={}", dto.getLampId(), dto.getCommandType());
+        } else {
             command.setCommandStatus(3); // 3-失败
-            controlCommandMapper.updateById(command);
-            log.error("LED控制指令下发失败: lampId={}", dto.getLampId(), e);
+            log.error("LED 控制指令下发失败（MQTT发送失败）: lampId={}", dto.getLampId());
         }
+        controlCommandMapper.updateById(command);
 
         return command;
     }

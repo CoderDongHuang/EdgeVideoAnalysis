@@ -47,6 +47,20 @@ knife4j:
     enable-footer-custom: true
     footer-custom-content: "EdgeVideoAnalysis | 省一作品"
 
+# MQTT配置
+mqtt:
+  broker-url: tcp://localhost:1883
+  client-id: eva-backend-${random.uuid}
+  command-topic-prefix: eva/device
+  qos: 1
+  connection-timeout: 10
+  keep-alive-interval: 60
+
+# AI推理服务配置
+ai:
+  yolov8:
+    url: http://localhost:5000/inference
+
 # 日志配置
 logging:
   level:

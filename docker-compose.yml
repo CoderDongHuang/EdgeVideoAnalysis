@@ -44,6 +44,23 @@ services:
       timeout: 5s
       retries: 5
 
+  # MQTT Broker (Mosquitto)
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: eva-mosquitto
+    restart: always
+    ports:
+      - "${MQTT_PORT:-1883}:1883"
+    volumes:
+      - mosquitto-data:/mosquitto/data
+    networks:
+      - eva-network
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/#", "-C", "1", "-i", "healthcheck", "-W", "3"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # YOLOv8推理服务
   yolov8:
     build:
@@ -65,7 +82,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s 
+      start_period: 10s
 
   # 后端服务
   backend:
@@ -81,6 +98,7 @@ services:
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
       SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-123456}
+      MQTT_BROKER_URL: tcp://mosquitto:1883
       YOLO_SERVICE_URL: http://yolov8:5000
     ports:
       - "${BACKEND_PORT:-8080}:8080"
@@ -88,6 +106,8 @@ services:
       mysql:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      mosquitto:
         condition: service_healthy
       yolov8:
         condition: service_healthy
@@ -105,6 +125,8 @@ volumes:
   mysql-data:
     driver: local
   redis-data:
+    driver: local
+  mosquitto-data:
     driver: local
   yolov8-models:
     driver: local
