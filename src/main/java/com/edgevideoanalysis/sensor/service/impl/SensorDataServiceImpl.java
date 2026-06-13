@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -33,6 +34,14 @@ public class SensorDataServiceImpl implements ISensorDataService {
     private final SensorDataProducer sensorDataProducer;
 
     private static final String SENSOR_LATEST_KEY = "sensor:latest:";
+    private static final String SENSOR_LOCK_KEY = "sensor:lock:";
+    private static final String NULL_MARKER = "__NULL__";
+
+    private static final long CACHE_TTL_SECONDS = 3600;       // 基础TTL 1小时
+    private static final long NULL_TTL_SECONDS = 300;         // 空值TTL 5分钟 (防穿透)
+    private static final long LOCK_TTL_SECONDS = 10;          // 互斥锁TTL 10秒 (防击穿)
+    private static final int  LOCK_RETRY_TIMES = 5;           // 锁重试次数
+    private static final long LOCK_RETRY_SLEEP_MS = 50;      // 锁重试间隔
 
     @Override
     public void reportData(SensorDataDTO dto) {
@@ -62,10 +71,11 @@ public class SensorDataServiceImpl implements ISensorDataService {
 
         sensorDataMapper.insert(entity);
 
-        // 缓存最新数据到Redis
+        // 缓存最新数据到Redis（TTL加随机偏移防雪崩）
         String redisKey = SENSOR_LATEST_KEY + dto.getLampId();
         String cacheData = JSON.toJSONString(dto);
-        stringRedisTemplate.opsForValue().set(redisKey, cacheData, 1, TimeUnit.HOURS);
+        long ttl = randomizeTtl(CACHE_TTL_SECONDS);
+        stringRedisTemplate.opsForValue().set(redisKey, cacheData, ttl, TimeUnit.SECONDS);
 
         // 检查并触发报警
         alarmRecordService.checkAndCreateAlarm(entity);
@@ -73,29 +83,105 @@ public class SensorDataServiceImpl implements ISensorDataService {
 
     @Override
     public SensorDataVO getLatestData(Long lampId) {
-        // 先从Redis缓存获取
         String redisKey = SENSOR_LATEST_KEY + lampId;
+
+        // 1. 查缓存
         String cacheData = stringRedisTemplate.opsForValue().get(redisKey);
         if (cacheData != null) {
+            // 1a. 空值标记（防穿透）：缓存了不存在的数据
+            if (NULL_MARKER.equals(cacheData)) {
+                throw new BusinessException("未找到传感器数据");
+            }
             return JSON.parseObject(cacheData, SensorDataVO.class);
         }
 
-        // 缓存未命中，查询数据库
+        // 2. 缓存未命中 → 分布式互斥锁防击穿
+        String lockKey = SENSOR_LOCK_KEY + lampId;
+        boolean lockAcquired = acquireLock(lockKey);
+        if (lockAcquired) {
+            try {
+                // 双重检查：获锁后再次查缓存（其他线程可能已重建）
+                cacheData = stringRedisTemplate.opsForValue().get(redisKey);
+                if (cacheData != null) {
+                    if (NULL_MARKER.equals(cacheData)) {
+                        throw new BusinessException("未找到传感器数据");
+                    }
+                    return JSON.parseObject(cacheData, SensorDataVO.class);
+                }
+                // 查DB重建缓存
+                return rebuildCache(lampId, redisKey);
+            } finally {
+                releaseLock(lockKey);
+            }
+        }
+
+        // 3. 未获取锁 → 自旋等待 + 重试读缓存
+        for (int i = 0; i < LOCK_RETRY_TIMES; i++) {
+            try {
+                Thread.sleep(LOCK_RETRY_SLEEP_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+            cacheData = stringRedisTemplate.opsForValue().get(redisKey);
+            if (cacheData != null) {
+                if (NULL_MARKER.equals(cacheData)) {
+                    throw new BusinessException("未找到传感器数据");
+                }
+                return JSON.parseObject(cacheData, SensorDataVO.class);
+            }
+        }
+
+        // 4. 超时未等到 → 最后兜底直查DB
+        log.warn("获取分布式锁超时，直达DB: lampId={}", lampId);
+        return rebuildCache(lampId, redisKey);
+    }
+
+    /**
+     * 查DB并重建缓存
+     */
+    private SensorDataVO rebuildCache(Long lampId, String redisKey) {
         LambdaQueryWrapper<SensorData> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SensorData::getLampId, lampId)
                .orderByDesc(SensorData::getCaptureTime)
                .last("LIMIT 1");
         SensorData data = sensorDataMapper.selectOne(wrapper);
+
         if (data == null) {
+            // 缓存空值，防穿透
+            stringRedisTemplate.opsForValue().set(redisKey, NULL_MARKER,
+                    randomizeTtl(NULL_TTL_SECONDS), TimeUnit.SECONDS);
             throw new BusinessException("未找到传感器数据");
         }
 
-        // 写入缓存
         SensorDataVO vo = convertToVO(data);
-        String newCacheData = JSON.toJSONString(vo);
-        stringRedisTemplate.opsForValue().set(redisKey, newCacheData, 1, TimeUnit.HOURS);
-
+        stringRedisTemplate.opsForValue().set(redisKey, JSON.toJSONString(vo),
+                randomizeTtl(CACHE_TTL_SECONDS), TimeUnit.SECONDS);
         return vo;
+    }
+
+    /**
+     * 获取分布式互斥锁（SETNX）
+     */
+    private boolean acquireLock(String lockKey) {
+        return Boolean.TRUE.equals(
+                stringRedisTemplate.opsForValue()
+                        .setIfAbsent(lockKey, "1", LOCK_TTL_SECONDS, TimeUnit.SECONDS));
+    }
+
+    /**
+     * 释放分布式锁
+     */
+    private void releaseLock(String lockKey) {
+        stringRedisTemplate.delete(lockKey);
+    }
+
+    /**
+     * TTL 加随机偏移（±10%），防雪崩
+     */
+    private long randomizeTtl(long baseTtlSeconds) {
+        long offset = (long) (baseTtlSeconds * 0.1 * ThreadLocalRandom.current().nextDouble());
+        return baseTtlSeconds + (ThreadLocalRandom.current().nextBoolean() ? offset : -offset);
     }
 
     @Override

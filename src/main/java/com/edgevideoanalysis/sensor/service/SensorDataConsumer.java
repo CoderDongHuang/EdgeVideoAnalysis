@@ -12,11 +12,12 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 /**
  * 传感器数据消费者
- * 从 RabbitMQ 消费 → 写库 → 缓存 → 告警判定
+ * 从 RabbitMQ 消费 → 写库 → 缓存（TTL随机偏移防雪崩） → 告警判定
  */
 @Slf4j
 @Component
@@ -28,6 +29,7 @@ public class SensorDataConsumer {
     private final IAlarmRecordService alarmRecordService;
 
     private static final String SENSOR_LATEST_KEY = "sensor:latest:";
+    private static final long CACHE_TTL_SECONDS = 3600;
 
     @RabbitListener(queues = RabbitMQConfig.SENSOR_QUEUE)
     public void handleSensorData(SensorDataDTO dto) {
@@ -38,10 +40,11 @@ public class SensorDataConsumer {
             SensorData entity = toEntity(dto);
             sensorDataMapper.insert(entity);
 
-            // 2. 缓存最新数据到 Redis（TTL 1小时）
+            // 2. 缓存最新数据到 Redis（TTL加随机偏移防雪崩）
             String redisKey = SENSOR_LATEST_KEY + dto.getLampId();
+            long ttl = randomizeTtl(CACHE_TTL_SECONDS);
             stringRedisTemplate.opsForValue().set(
-                    redisKey, JSON.toJSONString(dto), 1, TimeUnit.HOURS);
+                    redisKey, JSON.toJSONString(dto), ttl, TimeUnit.SECONDS);
 
             // 3. 触发告警检查
             alarmRecordService.checkAndCreateAlarm(entity);
@@ -49,10 +52,13 @@ public class SensorDataConsumer {
             log.debug("传感器数据消费完成: lampId={}", dto.getLampId());
         } catch (Exception e) {
             log.error("消费传感器数据失败: lampId={}", dto.getLampId(), e);
-            // 异常会被 RabbitMQ listener retry 处理（最多3次），
-            // 全部失败后进入死信队列 sensor.data.dlq
             throw e;
         }
+    }
+
+    private long randomizeTtl(long baseTtlSeconds) {
+        long offset = (long) (baseTtlSeconds * 0.1 * ThreadLocalRandom.current().nextDouble());
+        return baseTtlSeconds + (ThreadLocalRandom.current().nextBoolean() ? offset : -offset);
     }
 
     private SensorData toEntity(SensorDataDTO dto) {
